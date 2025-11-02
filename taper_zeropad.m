@@ -1,5 +1,5 @@
 function [x_final, total_length, n_prepended] = taper_zeropad(x, varargin)
-% TAPER_ZEROPAD - 对信号进行直接加窗并零填充（日本PPT）
+% TAPER_ZEROPAD - 对信号进行直接加窗并零填充（日本PPT推荐流程）
 %
 % Syntax: [x_final, total_length, n_prepended] = taper_zeropad(x, varargin)
 %

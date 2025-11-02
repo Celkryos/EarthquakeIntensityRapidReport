@@ -72,14 +72,6 @@ function earthquake_data = read_earthquake_data(filename)
             warning('未找到采样频率，使用样本序号作为时间轴');
         end
         
-        % 计算统计信息
-        if isfield(earthquake_data, 'acceleration_gal')
-            earthquake_data.computed_max_acc = max(abs(earthquake_data.acceleration_gal));
-            earthquake_data.computed_min_acc = min(earthquake_data.acceleration_gal);
-            earthquake_data.computed_mean_acc = mean(earthquake_data.acceleration_gal);
-            earthquake_data.computed_std_acc = std(earthquake_data.acceleration_gal);
-        end
-        
     catch ME
         if fid ~= -1
             fclose(fid);

@@ -14,8 +14,8 @@ function [y_corrected, trend, coeffs] = polyfit_constrained_zerobase(t, y, order
     % 确保输入是列向量
     t_col = t(:);
     y_col = y(:);
-        
-
+        length(t_col)
+length(y_col)
     % 构建设计矩阵 A
     % 要拟合 y = c_n*t^n + ... + c_2*t^2 所以矩阵的每一列是 t 的某个幂次
     num_coeffs = order - 1; % 只求解 c2 到 c_order 这几个系数

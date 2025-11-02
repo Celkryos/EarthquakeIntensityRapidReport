@@ -4,18 +4,18 @@ function data = nb_filt(data, T0)%------------------ 参数 ------------------%
 %
 % 输入：
 %   data.sampling_freq_hz   - 采样频率 (Hz)
-%   data.acceleration_gal   - 加速度时程 (gal)
+%   data.acceleration_jjh   - 加速度时程 (gal)
 %   data.time               - (可选) 时间轴 (s)
 %   T0                      - "最高频率对应周期"(s)，fc = 1/T0
 %
 % 输出：
-%   data.nb_acc_T0  - 低通后的加速度（gal）
+%   data.nb_acc_T0  - 滤波后的加速度（gal）
     
     %------------------ 参数 ------------------%
     fs   = data.sampling_freq_hz;
-    xacc = data.acceleration_gal(:);
+    xacc = data.acceleration_jjh(:);
     N    = length(xacc);
-    keshihua = 1; % 可视化开关
+    keshihua = 0; % 可视化开关
     
     % 时间轴
     if ~isfield(data,'time') || isempty(data.time)
@@ -24,7 +24,7 @@ function data = nb_filt(data, T0)%------------------ 参数 ------------------%
         data.time = data.time(:);
     end
     if length(data.time) ~= N
-        error('data.time 长度与 acceleration_gal 不一致。');
+        error('data.time 长度与 acceleration_jjh 不一致。');
     end
 
     % 截止频率
@@ -38,7 +38,7 @@ function data = nb_filt(data, T0)%------------------ 参数 ------------------%
     dt = 1/fs;                         % 时间步长
 
     %------------------ 频域滤波参数 ------------------%
-    % 滤波器阶数
+    % 滤波器阶数 当信号较短时需考虑自适应调整 当前数据集（9.0）可固定6阶
     if T0==10 
         jie=2;
     elseif T0==5
@@ -49,19 +49,26 @@ function data = nb_filt(data, T0)%------------------ 参数 ------------------%
         jie=6;
     end
 
+    jie=6;
+
     
     n_low = jie;   % 低通滤波器阶数
     n_high = jie;  % 高通滤波器阶数
     
     %------------------ 准备时域信号 (去趋势 & 自适应填充) ------------------%
-    % 1. 去均值和线性趋势
-    x_d = detrend(xacc, 1);
+    % 1. 去均值和线性趋势（这一步已分进单独的初步预处理函数）
+    % x_d = detrend(xacc, 1);
     
     % 2. 自适应 镜像填充→渐隐→零填充
     % 确定最终用于FFT的信号 xpad 和它的长度 totallength
 
-    %[xpad, totallength, tbegin] = adaptive_padding(x_d);
-    [xpad, totallength, tbegin] = taper_zeropad(x_d, 'TaperPercent', 10);
+    moshi=0;    % 内置变量 1采用我的处理函数 0采用经典流程函数
+    
+    if moshi
+        [xpad, totallength, tbegin] = adaptive_padding(xacc);
+    else
+        [xpad, totallength, tbegin] = taper_zeropad(xacc, 'TaperPercent', 10);
+    end
 
 
     % 3. 设计频域滤波器
@@ -84,16 +91,20 @@ function data = nb_filt(data, T0)%------------------ 参数 ------------------%
     X_freq_filtered = zeros(size(X_freq));
     X_freq_filtered(1:Nnyq) = X_freq(1:Nnyq) .* tf_bandpass; 
     
-    % 7. 构造共轭对称 (这部分不变)
+    
+    data.lvboqi=tf_bandpass;
+
+
+    % 7. 构造共轭对称 
     X_freq_filtered(1) = real(X_freq_filtered(1));
     X_freq_filtered(Nnyq) = real(X_freq_filtered(Nnyq));
     X_freq_filtered(totallength+2-(2:Nnyq-1)) = conj(X_freq_filtered(2:Nnyq-1));
     
     % 8. IFFT变换回时域
     y_acc_pad = real(ifft(X_freq_filtered));
-    %%%%%%%%%%%%%%%%%%%
-    data.weicaijian=y_acc_pad;
-    %%%%%%%%%%%%%%%%%%%%%%%%
+
+    data.acc_untrimmed = y_acc_pad;
+
     % 9. 提取有效信号部分 (使用 adaptive_padding 返回的 tbegin)
     y_acc = y_acc_pad(tbegin+1 : tbegin+N);
 
@@ -101,7 +112,11 @@ function data = nb_filt(data, T0)%------------------ 参数 ------------------%
     fname_acc = strrep(sprintf('nb_acc_%g', T0), '.', '_');
     data.(fname_acc) = y_acc;
 
-disp(max(abs(y_acc)));
+
+
+    data.trim_info.n_prepended = tbegin;
+    data.trim_info.original_length = N;
+
     %------------------ 可视化 ------------------%
     if keshihua
         figure;
