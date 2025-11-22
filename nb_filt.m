@@ -49,7 +49,7 @@ function data = nb_filt(data, T0)%------------------ 参数 ------------------%
         jie=6;
     end
 
-    jie=6;
+    jie=4;
 
     
     n_low = jie;   % 低通滤波器阶数
@@ -62,7 +62,7 @@ function data = nb_filt(data, T0)%------------------ 参数 ------------------%
     % 2. 自适应 镜像填充→渐隐→零填充
     % 确定最终用于FFT的信号 xpad 和它的长度 totallength
 
-    moshi=0;    % 内置变量 1采用我的处理函数 0采用经典流程函数
+    moshi=1;    % 内置变量 1采用我的处理函数 0采用经典流程函数
     
     if moshi
         [xpad, totallength, tbegin] = adaptive_padding(xacc);
