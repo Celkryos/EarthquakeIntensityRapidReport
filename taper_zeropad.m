@@ -16,7 +16,7 @@ function [x_final, total_length, n_prepended] = taper_zeropad(x, varargin)
 % Outputs:
 %   x_final     - 经过完整处理后，可以直接用于FFT的信号
 %   total_length- x_final 的总长度 (通常补到2的幂次)
-%   n_prepended - 在原始信号前端增加的零填充点数，用于后续截取
+%   n_prepended - 前端零填充点数（当前实现始终为0，零填充仅加在尾部）
 
     % --- 1. 解析输入参数 ---
     p = inputParser;
@@ -41,13 +41,12 @@ function [x_final, total_length, n_prepended] = taper_zeropad(x, varargin)
     min_length = npts * pad_factor;
     total_length = 2^nextpow2(min_length);
     
-    % 将信号居中放置在零填充数组中
-    n_pre_pad = floor((total_length - npts) / 2);
-    n_post_pad = total_length - npts - n_pre_pad;
+    % 只在尾部零填充（避免前端平移，与adaptive_padding保持一致）
+    n_post_pad = total_length - npts;
     
-    x_final = [zeros(n_pre_pad, 1); x_tapered; zeros(n_post_pad, 1)];
+    x_final = [x_tapered; zeros(n_post_pad, 1)];
     
-    % 计算在原始信号前端增加的总点数
-    n_prepended = n_pre_pad;
+    % 前端无填充，n_prepended为0
+    n_prepended = 0;
 
 end
