@@ -1,11 +1,5 @@
 function [x_final, total_length, n_prepended] = taper_zeropad(x, varargin)
-% TAPER_ZEROPAD - 对信号进行直接加窗并零填充（日本PPT推荐流程）
-%
-% Syntax: [x_final, total_length, n_prepended] = taper_zeropad(x, varargin)
-%
-% Description:
-%   本函数对输入信号直接施加一个余弦渐隐窗（Tukey window），然后进行零填充
-%
+% TAPER_ZEROPAD - 对信号进行直接加窗并零填充
 % Inputs:
 %   x - 输入的列向量信号
 %
@@ -42,8 +36,12 @@ function [x_final, total_length, n_prepended] = taper_zeropad(x, varargin)
     total_length = 2^nextpow2(min_length);
     
     % 将信号居中放置在零填充数组中
-    n_post_pad = total_length - npts;
-    x_final = [x_tapered; zeros(n_post_pad, 1)];
-    n_prepended = 0;
+    n_pre_pad = floor((total_length - npts) / 2);
+    n_post_pad = total_length - npts - n_pre_pad;
+    
+    x_final = [zeros(n_pre_pad, 1); x_tapered; zeros(n_post_pad, 1)];
+    
+    % 计算在原始信号前端增加的总点数
+    n_prepended = n_pre_pad;
 
 end

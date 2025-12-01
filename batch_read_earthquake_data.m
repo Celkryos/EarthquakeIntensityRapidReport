@@ -10,8 +10,9 @@ function all_data = batch_read_earthquake_data(folder_path)
     % 查找所有 .EW 和 .NS 文件
     ew_files = dir(fullfile(folder_path, '*.EW'));
     ns_files = dir(fullfile(folder_path, '*.NS'));
+    ud_files = dir(fullfile(folder_path, '*.UD'));
     
-    all_files = [ew_files; ns_files];
+    all_files = [ew_files; ns_files;ud_files];
     
     if isempty(all_files)
         warning('未找到任何 .EW 或 .NS 文件');
