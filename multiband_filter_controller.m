@@ -1,7 +1,9 @@
 function adata = multiband_filter_controller(adata, paired_stations, T_list, fc_high)
 % MULTIBAND_FILTER_CONTROLLER
-% 对水平分量 (EW/NS) 做多频段 nb_filt 滤波，
-% 保存“带 pad 的 acc_untrimmed”，暂不裁剪。
+% 做多频段 nb_filt 滤波
+%   - 对 T0 ~= 0.1 s：只处理水平分量 (EW/NS)
+%   - 对 T0 == 0.1 s：处理三分量 (EW/NS/UD)
+% 保存“带 pad 的 acc_Txxx”，暂不裁剪。
 
     if isempty(T_list)
         warning('T_list 为空，multiband_filter_controller 未执行任何滤波。');
@@ -21,6 +23,8 @@ function adata = multiband_filter_controller(adata, paired_stations, T_list, fc_
             fprintf('跳过无效台站 %s\n', sta_name);
             continue;
         end
+
+        % 必须至少有 EW/NS
         if ~isfield(sta_info, 'ew') || ~isfield(sta_info, 'ns')
             fprintf('台站 %s 缺少 EW/NS 索引，跳过。\n', sta_name);
             continue;
@@ -28,38 +32,44 @@ function adata = multiband_filter_controller(adata, paired_stations, T_list, fc_
 
         idx_ew = sta_info.ew;
         idx_ns = sta_info.ns;
+        idx_ud = sta_info.ud;
         if isempty(adata{idx_ew}) || isempty(adata{idx_ns})
             fprintf('台站 %s 在 adata 中记录为空，跳过。\n', sta_name);
             continue;
         end
 
-        fprintf('处理台站 %s (EW=%d, NS=%d)...\n', sta_name, idx_ew, idx_ns);
+        % 构造要处理的分量列表
+        comp_indices = [idx_ew, idx_ns,idx_ud];
+        comp_labels  = {'ew', 'ns','ud'};        
+        fprintf('处理台站 %s\n', sta_name);
 
-        comp_indices = [idx_ew, idx_ns];
-        comp_labels  = {'ew', 'ns'};
-
-        for ic = 1:2
+        for ic = 1:numel(comp_indices)
             comp_idx = comp_indices(ic);
             comp_lab = comp_labels{ic};
 
             data_orig = adata{comp_idx};
-
-            % 确保 padding 信息只存一份（与 T0 无关）
-            if ~isfield(data_orig, 'trim_info')
-                % 后面第一次调用 nb_filt 会生成 trim_info
+            if isempty(data_orig)
+                continue;
             end
 
             for iT = 1:numel(T_list)
                 T0 = T_list(iT);
+                % T0 == 0.1 s：三分量都处理
+                % T0 ~= 0.1 s：只处理 EW/NS，跳过 UD
+                is_T01 = abs(T0 - 0.1) < 1e-6;
+                if ~is_T01 && strcmp(comp_lab, 'ud')
+                    % 非 0.1 s 且是 UD 分量 → 跳过
+                    continue;
+                end
 
-                % 调用 nb_filt(data, fc_high, T0)
+                % 调用纯函数 nb_filt
                 [acc_untrim, trim_info] = nb_filt(data_orig, fc_high, T0);
-                
-                % 生成字段名，例如 acc_untrim_T10s
-                T_str   = sprintf('T%.3fs', T0);
+
+                % 生成字段名，例如 acc_T5_000s, acc_T0_100s
+                T_str   = sprintf('T%.3fs', T0);                   % "T5.000s"
                 fieldnm = matlab.lang.makeValidName(['acc_' T_str]);
                 adata{comp_idx}.(fieldnm) = acc_untrim;
-                
+
                 % trim_info 只存一份（各 T0 共用同一 padding）
                 if ~isfield(adata{comp_idx}, 'trim_info')
                     adata{comp_idx}.trim_info = trim_info;

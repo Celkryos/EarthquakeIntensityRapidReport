@@ -37,7 +37,7 @@ function data = acc2vel(data, acc_field_names)
         disp_untrimmed = cumtrapz(detrend(vel_untrimmed, 1)) * dt;
 
         % 3. 生成速度/位移字段名
-        %    把前缀 "acc" 换成 "vel"/"disp"（仅替换第一个）
+        %    把前缀 acc 换成 vel/disp
         vel_field  = regexprep(acc_field, '^acc', 'vel', 1);
         disp_field = regexprep(acc_field, '^acc', 'disp', 1);
 

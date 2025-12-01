@@ -40,11 +40,11 @@ function [adata, paired_stations, rejected_info] = check_truncated_records(adata
     for i = 1:length(station_names)
         name = station_names{i};
         
-        % 获取 EW 和 NS 的索引
+        % 获取的索引
         idx_ew = paired_stations.(name).ew;
         idx_ns = paired_stations.(name).ns;
         idx_ud = paired_stations.(name).ud;
-        % 提取数据 (以EW为例进行计算)
+        % 提取数据 (以ud为例进行计算)
         data = adata{idx_ud}; 
         
         try

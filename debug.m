@@ -21,17 +21,19 @@ adata=chubu(adata);
 [adata, stations, rejected_info] = check_truncated_records(adata, stations);
 
 %% 多频段滤波
-T_list  = [5, 2, 1, 0.5];   % 
+T_list  = [5, 2, 1, 0.5,0.1];   % 
 fc_high = 0.1;
 adata = multiband_filter_controller(adata, stations, T_list, fc_high);
 %% 积
-acc_fields = {'acc_T5_000s','acc_T2_000s','acc_T1_000s','acc_T0_500s'};
+acc_fields = {'acc_T5_000s','acc_T2_000s','acc_T1_000s','acc_T0_500s','acc_T0_100s'};
 for i = 1:numel(adata)
     if ~(adata{i}.is_valid), continue; end
     adata{i} = acc2vel(adata{i}, acc_fields);
 end
-%%
-% 4.统一裁剪
+%% 合成时程（水平 / 三分量）
+stations = hcsc(adata, stations, T_list);
+
+%% 4.统一裁剪
 
 info = adata{n, 1}.trim_info;
 start_idx = info.n_prepended + 1;
@@ -47,7 +49,7 @@ disp(max(abs(adata{n, 1}.acceleration_gal_processed))); %检查，显示处理�
 
 %plot(adata{n, 1}.time, adata{n, 1}.velocity_cms)
 %disp(max(abs(adata{n, 1}.velocity_cms))); %检查，显示处理后的pgv
-end
+
 
 %% 批量合成时程
 stations = hcsc(adata, stations);
