@@ -41,13 +41,12 @@ function [x_final, total_length, n_prepended] = taper_zeropad(x, varargin)
     min_length = npts * pad_factor;
     total_length = 2^nextpow2(min_length);
     
-    % 将信号居中放置在零填充数组中
-    n_pre_pad = floor((total_length - npts) / 2);
-    n_post_pad = total_length - npts - n_pre_pad;
+    % 只在尾部零填充（避免前端平移），保持信号索引一致性
+    n_post_pad = total_length - npts;
     
-    x_final = [zeros(n_pre_pad, 1); x_tapered; zeros(n_post_pad, 1)];
+    x_final = [x_tapered; zeros(n_post_pad, 1)];
     
-    % 计算在原始信号前端增加的总点数
-    n_prepended = n_pre_pad;
+    % 前端无填充，n_prepended为0，后续处理无需修正索引
+    n_prepended = 0;
 
 end
