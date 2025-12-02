@@ -32,28 +32,56 @@ for i = 1:numel(adata)
 end
 %% 合成时程（水平 / 三分量）
 stations = hcsc(adata, stations, T_list);
+%% 计算国标烈度
+stations = compute_intensity_gb(stations);
+%% 插值并输出等高线图
+% 1. 构造输入数组
+%ziduan='pga_T0_500_h';kong=true;
+ziduan='pga_T2_000_h';kong=true;
+%ziduan='I_gb';kong=false;
+names = fieldnames(stations);
+lon_sta = [];
+lat_sta = [];
+val_sta = [];
 
-%% 4.统一裁剪
+for i = 1:numel(names)
+    s = stations.(names{i});
+    % 只要 is_valid的台站
+    if ~isfield(s, 'is_valid') || ~s.is_valid
+        continue;   % 跳
+    end
 
-info = adata{n, 1}.trim_info;
-start_idx = info.n_prepended + 1;
-end_idx   = info.n_prepended + info.original_length;
+    % 需存在相应字段
+    if ~isfield(s, ziduan)
+        continue;   % 跳
+    end
 
-% 执行裁剪
-adata{n, 1}.acceleration_gal_processed = adata{n, 1}.acc_untrimmed(start_idx:end_idx);
-adata{n, 1}.velocity_cms = adata{n, 1}.vel_untrimmed(start_idx:end_idx);
-adata{n, 1}.displacement_cm = adata{n, 1}.disp_corrected_untrimmed(start_idx:end_idx);
+    % 纳入插值列表
+    lon_sta(end+1,1) = s.station_long;
+    lat_sta(end+1,1) = s.station_lat;
+    val_sta(end+1,1) = s.(ziduan);
+end
 
-disp(max(abs(adata{n, 1}.acceleration_gal_processed))); %检查，显示处理后的pga
-
-
-%plot(adata{n, 1}.time, adata{n, 1}.velocity_cms)
-%disp(max(abs(adata{n, 1}.velocity_cms))); %检查，显示处理后的pgv
+n_valid = numel(val_sta); % 合法台站数
 
 
-%% 批量合成时程
-stations = hcsc(adata, stations);
+
+% 插值
+
+[LonG, LatG, ZZ, metaZ] = interp2d_field( ...
+    lon_sta, lat_sta, val_sta, ...
+    'UseLog', kong, ...
+    'GridStep', 0.02, ...
+    'NumLevels', 12);
+%
+% 画图
+figure;
+plot_contour_field(LonG, LatG, ZZ, metaZ, lon_sta, lat_sta);
+
+
+
 
 %%
 %plotSpectrum(x, fs);
-
+% 测试另一个函数
+[Xq, Yq, Vq] = interp_seismic_field(lon_sta, lat_sta, val_sta, 'linear');

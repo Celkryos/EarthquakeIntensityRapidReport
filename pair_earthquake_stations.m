@@ -8,7 +8,10 @@ function [paired_stations, unpaired_info] = pair_earthquake_stations(adata)
 % 输入：adata (包含 .EW, .NS, .UD 数据)
 %
 % 输出:
-%   paired_stations - 结构体，字段名为台站代码。包含 .ew, .ns, .ud 三个属性(索引)。
+%   paired_stations - 结构体，字段名为台站代码。包含：
+%       .ew, .ns, .ud          三个分量在 adata 中的索引
+%       .station_lat           台站纬度
+%       .station_long          台站经度
 %   unpaired_info   - 结构体数组，记录未能凑齐3个分量的台站信息。
 
     % 初始化
@@ -17,7 +20,7 @@ function [paired_stations, unpaired_info] = pair_earthquake_stations(adata)
         warning('输入数据为空。');
     end
     
-    % 检查是否能被3整除（只是个警告，不影响后续处理）
+    % 检查是否能被3整除（只是警告，不影响后续处理）
     if mod(nn, 3) ~= 0
         warning('输入数据总数 (%d) 不是3的倍数，可能存在缺失分量的台站。', nn);
     end
@@ -33,7 +36,6 @@ function [paired_stations, unpaired_info] = pair_earthquake_stations(adata)
 
     % --- 1. 快速匹配 (i, i+n/3, i+2n/3) ---
     fprintf('--- 开始快速匹配 (三分量) ---\n');
-    % 只有当数据量足够且大概率是对齐时才尝试
     if n_third > 0
         for i = 1:n_third
             % 候选索引
@@ -41,7 +43,6 @@ function [paired_stations, unpaired_info] = pair_earthquake_stations(adata)
             idx2 = i + n_third;
             idx3 = i + 2 * n_third;
             
-            % 越界保护
             if idx3 > nn, continue; end
             
             code1 = adata{idx1}.station_code;
@@ -55,7 +56,6 @@ function [paired_stations, unpaired_info] = pair_earthquake_stations(adata)
                 indices = [idx1, idx2, idx3];
                 dirs = {adata{idx1}.direction, adata{idx2}.direction, adata{idx3}.direction};
                 
-                % 临时结构体用于存放当前组
                 temp_s = struct();
                 
                 for k = 1:3
@@ -69,16 +69,17 @@ function [paired_stations, unpaired_info] = pair_earthquake_stations(adata)
                     end
                 end
                 
-                % 只有当三个方向都齐了才算成功
+                % 三个方向都齐
                 if isfield(temp_s, 'ew') && isfield(temp_s, 'ns') && isfield(temp_s, 'ud')
                     station_field_name = matlab.lang.makeValidName(code1);
+
+                    % 从任一分量拷贝台站经纬度(ew)
+                    temp_s.station_lat  = adata{temp_s.ew}.station_lat;
+                    temp_s.station_long = adata{temp_s.ew}.station_long;
+
                     paired_stations.(station_field_name) = temp_s;
                     
-                    % 标记已处理
                     processed_flags([idx1, idx2, idx3]) = true;
-                    
-                    % 仅打印部分日志以免刷屏
-                    % fprintf('快速匹配成功: %s\n', code1);
                 end
             end
         end
@@ -89,8 +90,7 @@ function [paired_stations, unpaired_info] = pair_earthquake_stations(adata)
     if ~isempty(unprocessed_indices)
         fprintf('--- 快速匹配完成，对剩余 %d 个记录进行全局搜索 ---\n', length(unprocessed_indices));
         
-        % 为了效率，先把剩余数据的 idx 分组归类到 Map 中
-        % Key: StationCode, Value: [idx1, idx2, ...]
+        % Map: Key = StationCode, Value = [idx1, idx2, ...]
         station_map = containers.Map('KeyType', 'char', 'ValueType', 'any');
         
         for k = 1:length(unprocessed_indices)
@@ -104,7 +104,7 @@ function [paired_stations, unpaired_info] = pair_earthquake_stations(adata)
             end
         end
         
-        % 遍历 Map 中的每个台站，检查分量是否齐全
+        % 遍历每个台站
         keys = station_map.keys;
         for k = 1:length(keys)
             s_code = keys{k};
@@ -128,21 +128,24 @@ function [paired_stations, unpaired_info] = pair_earthquake_stations(adata)
             
             % 检查是否凑齐三兄弟
             if isfield(temp_s, 'ew') && isfield(temp_s, 'ns') && isfield(temp_s, 'ud')
-                % 配对成功
                 station_field_name = matlab.lang.makeValidName(s_code);
+
+                % 写入台站经纬度
+                temp_s.station_lat  = adata{temp_s.ew}.station_lat;
+                temp_s.station_long = adata{temp_s.ew}.station_long;
+
                 paired_stations.(station_field_name) = temp_s;
                 
-                processed_flags(idxs) = true; % 标记(虽然不需要了，但保持逻辑一致)
+                processed_flags(idxs) = true;
                 fprintf('全局匹配成功: %s (EW:%d, NS:%d, UD:%d)\n', ...
                     s_code, temp_s.ew, temp_s.ns, temp_s.ud);
             else
-                % 未凑齐 (可能是只有2个分量，或者有重复分量)
-                % 将这些索引加入未配对列表
+                % 未凑齐 → 记录为未配对
                 for m = 1:length(idxs)
                     idx = idxs(m);
-                    unpaired_list(end+1).station_code = s_code;
-                    unpaired_list(end).index = idx;
-                    unpaired_list(end).direction = adata{idx}.direction;
+                    unpaired_list(end+1).station_code = s_code; %#ok<AGROW>
+                    unpaired_list(end).index          = idx;
+                    unpaired_list(end).direction      = adata{idx}.direction;
                 end
             end
         end
