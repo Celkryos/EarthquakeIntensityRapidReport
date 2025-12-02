@@ -54,6 +54,7 @@ function adata = multiband_filter_controller(adata, paired_stations, T_list, fc_
 
             for iT = 1:numel(T_list)
                 T0 = T_list(iT);
+                fch=fc_high(iT);
                 % T0 == 0.1 s：三分量都处理
                 % T0 ~= 0.1 s：只处理 EW/NS，跳过 UD
                 is_T01 = abs(T0 - 0.1) < 1e-6;
@@ -63,7 +64,7 @@ function adata = multiband_filter_controller(adata, paired_stations, T_list, fc_
                 end
 
                 % 调用纯函数 nb_filt
-                [acc_untrim, trim_info] = nb_filt(data_orig, fc_high, T0);
+                [acc_untrim, trim_info] = nb_filt(data_orig, fch, T0);
 
                 % 生成字段名，例如 acc_T5_000s, acc_T0_100s
                 T_str   = sprintf('T%.3fs', T0);                   % "T5.000s"
@@ -80,7 +81,7 @@ function adata = multiband_filter_controller(adata, paired_stations, T_list, fc_
                 end
 
                 fprintf('   [%s] %s -> %s 完成，T0=%.3fs, fc_high=%.3f Hz\n', ...
-                    sta_name, comp_lab, fieldnm, T0, fc_high);
+                    sta_name, comp_lab, fieldnm, T0, fch);
             end
         end
     end
