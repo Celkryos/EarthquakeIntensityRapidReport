@@ -24,8 +24,8 @@ for i = 1:numel(names)
 end
 In=val_sta;
 %%
-pinduan = {'pga_T0_100','pga_T0_500_h', 'pga_T1_000_h', 'pga_T2_000_h', 'pga_T5_000_h'};
-%pinduan = {'pgv_T0_100','pgv_T0_500_h', 'pgv_T1_000_h', 'pgv_T2_000_h', 'pgv_T5_000_h'};
+%pinduan = {'pga_T0_100','pga_T0_500_h', 'pga_T1_000_h', 'pga_T2_000_h', 'pga_T5_000_h'};
+pinduan = {'pgv_T0_100','pgv_T0_500_h', 'pgv_T1_000_h', 'pgv_T2_000_h', 'pgv_T5_000_h'};
 
 R2=[];
 for p = 1:length(pinduan)

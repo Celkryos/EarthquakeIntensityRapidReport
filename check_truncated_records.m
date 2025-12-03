@@ -1,5 +1,5 @@
 function [adata, paired_stations, rejected_info] = check_truncated_records(adata, paired_stations, varargin)
-% CHECK_TRUNCATED_RECORDS - 检查并剔除截断记录，并为保留记录添加 lag, dist, noise_rms 参数
+% CHECK_TRUNCATED_RECORDS - 检查并剔除低信噪比记录，并为保留记录添加 lag, dist, noise_rms 参数
 %
 % 输入:
 %   adata           - 包含地震数据的 cell 数组
@@ -7,7 +7,7 @@ function [adata, paired_stations, rejected_info] = check_truncated_records(adata
 %   varargin        - 可选参数对:
 %       'Vp'            - P波平均波速 (km/s), 默认 5.0
 %       'CheckWindow'   - 检查起始噪声的时间窗长度 (s)
-%       'NoiseThreshold'- 起始RMS/PGA 的阈值，超过此值且时间晚到则判为截断。
+%       'NoiseThreshold'- 起始RMS/PGA 的阈值，超过此值且时间晚到则判为截断（这个基本不用了，以信噪比为基准）。
 %       'timelag'       - 允许的最大滞后时间阈值 (s)
 %
 % 输出:
@@ -19,10 +19,10 @@ function [adata, paired_stations, rejected_info] = check_truncated_records(adata
     p = inputParser;
     addRequired(p, 'adata');
     addRequired(p, 'paired_stations');
-    addParameter(p, 'Vp', 5.0, @isnumeric);           % km/s
+    addParameter(p, 'Vp', 4.5, @isnumeric);           % km/s
     addParameter(p, 'CheckWindow', 2.0, @isnumeric);  % 秒
     addParameter(p, 'NoiseThreshold', 0.15, @isnumeric); % 阈值
-    addParameter(p, 'timelag', -2.0, @isnumeric); % 时间滞后容忍阈值
+    addParameter(p, 'timelag', 55.0, @isnumeric); % 时间滞后容忍阈值
     parse(p, adata, paired_stations, varargin{:});
     
     Vp = p.Results.Vp;
@@ -33,7 +33,7 @@ function [adata, paired_stations, rejected_info] = check_truncated_records(adata
     station_names = fieldnames(paired_stations);
     rejected_info = struct('station', {}, 'reason', {});
     
-    fprintf('--- 开始进行截断记录筛查 (Vp=%.1f km/s, LagThres=%.1fs) ---\n', Vp, lag_thres);
+    fprintf('--- 开始筛查 (Vp=%.1f km/s, LagThres=%.1fs) ---\n', Vp, lag_thres);
     
     count_rejected = 0;
     
@@ -67,30 +67,64 @@ function [adata, paired_stations, rejected_info] = check_truncated_records(adata
             % 正值 = 记录开始晚于理论P波到时 (可能丢失初至)
             time_lag = seconds(t_start_real - t_arrival_theo);
             
-            % 3. 计算起始段能量 (RMS)
-            % 确保使用已进行初步基线校正的数据 acceleration_jjh
+            
+
+
+            %% 3 & 4. 计算 Arias 强度并确定噪声窗口
+
             fs = data.sampling_freq_hz;
-            n_samples_check = round(win_len * fs);
-            if n_samples_check > length(data.acceleration_jjh)
-                n_samples_check = length(data.acceleration_jjh);
+            dt = 1 / fs;
+
+            acc_full = detrend(data.acceleration_jjh(:), 'constant');
+            n_total  = length(acc_full);
+
+            % 先计算 Arias 强度，获取 idx_5 / idx_95
+            ai     = cumsum(acc_full.^2) * dt;
+            ai_max = ai(end);
+
+            if ai_max < eps
+                % 极端情况：信号全 0 或能量极小
+                idx_5  = n_total;
+                idx_95 = n_total;
+            else
+                ai_norm = ai / ai_max;
+
+                idx_5  = find(ai_norm >= 0.05, 1, 'first');
+                idx_95 = find(ai_norm >= 0.95, 1, 'first');
+
+                if isempty(idx_5),  idx_5  = 1;      end
+                if isempty(idx_95), idx_95 = n_total; end
             end
-            
-            acc_segment = detrend(data.acceleration_jjh(1:n_samples_check), 'constant');
-            start_rms = rms(acc_segment);
-            
-            full_pga = max(abs(detrend(data.acceleration_jjh, 'constant')));
-            if full_pga == 0, full_pga = eps; end
-            
-            noise_ratio = start_rms / full_pga;
-            
-            % 4. 综合判别逻辑
-            is_time_late  = time_lag > lag_thres;
+
+            % 噪声窗口长度：取 win_len 对应点数 与 idx_5 的较小值
+            % 防止强震早到污染噪声窗口
+            n_noise_samples = round(win_len * fs);
+            n_noise_samples = min([n_noise_samples, idx_5 - 1, n_total]);
+            n_noise_samples = max(n_noise_samples, 1);  % 至少 1 个样本
+
+            acc_noise_seg = acc_full(1:n_noise_samples);
+            start_rms     = rms(acc_noise_seg);
+
+            % 强震段 RMS（5%–95% 能量窗口）
+            if idx_95 - idx_5 < 2
+                strong_rms = rms(acc_full);              % 窗口太短就退回全段
+            else
+                strong_rms = rms(acc_full(idx_5:idx_95));
+            end
+
+            %% 5. 噪声比例
+            strong_rms  = max(strong_rms, eps);
+            noise_ratio = start_rms / strong_rms;
+
+            % 判别
+            %is_time_late  = time_lag > lag_thres;
+            %is_time_late  = false;
             is_high_noise = noise_ratio > noise_ratio_thres;
-            highhigh_noise= noise_ratio>(noise_ratio_thres+0.05);
-            
-            if (is_time_late && is_high_noise)||highhigh_noise
+            %highhigh_noise= noise_ratio>(noise_ratio_thres+0.05);
+            % 【【【【【】】】】】
+            if is_high_noise
                 % --- 剔除分支 ---
-                reason = sprintf('疑似截断记录: 滞后 %.2fs (>%.1f), 起始RMS占比 %.1f%%', ...
+                reason = sprintf('疑似低质记录: 滞后 %.2fs (>%.1f), 起始RMS占比 %.1f%%', ...
                     time_lag, lag_thres, noise_ratio*100);
                 
                 count_rejected = count_rejected + 1;

@@ -6,11 +6,20 @@ function all_data = batch_read_earthquake_data(folder_path)
     if nargin < 1
         folder_path = '.'; % 当前文件夹
     end
-    
-    % 查找所有 .EW 和 .NS 文件
-    ew_files = dir(fullfile(folder_path, '*.EW'));
-    ns_files = dir(fullfile(folder_path, '*.NS'));
-    ud_files = dir(fullfile(folder_path, '*.UD'));
+    % 保留 .EW.. 或 .EW2..  但排除 .EW1..
+    all_ew = dir(fullfile(folder_path, '*.EW*'));
+    ew_files = all_ew(~cellfun(@isempty, regexp({all_ew.name}, '\.EW([2]?)$')));
+    all_ns = dir(fullfile(folder_path, '*.NS*'));
+    ns_files = all_ns(~cellfun(@isempty, regexp({all_ns.name}, '\.NS([2]?)$')));
+
+    all_ud = dir(fullfile(folder_path, '*.UD*'));
+    ud_files = all_ud(~cellfun(@isempty, regexp({all_ud.name}, '\.UD([2]?)$')));
+
+
+    % 查找所有 .EW 和 .NS 文件（knet 用，kiknet加入后看上边↑）
+    %ew_files = dir(fullfile(folder_path, '*.EW*'));
+    %ns_files = dir(fullfile(folder_path, '*.NS*'));
+    %ud_files = dir(fullfile(folder_path, '*.UD*'));
     
     all_files = [ew_files; ns_files;ud_files];
     
