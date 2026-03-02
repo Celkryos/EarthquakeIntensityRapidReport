@@ -1,8 +1,7 @@
 function adata = multiband_filter_controller(adata, paired_stations, T_list, fc_high)
 % MULTIBAND_FILTER_CONTROLLER
 % 做多频段 nb_filt 滤波
-%   - 对 T0 ~= 0.1 s：只处理水平分量 (EW/NS)
-%   - 对 T0 == 0.1 s：处理三分量 (EW/NS/UD)
+%   - 所有频段只处理水平分量 (EW/NS)
 % 保存“带 pad 的 acc_Txxx”，暂不裁剪。
 
     if isempty(T_list)
@@ -32,15 +31,14 @@ function adata = multiband_filter_controller(adata, paired_stations, T_list, fc_
 
         idx_ew = sta_info.ew;
         idx_ns = sta_info.ns;
-        idx_ud = sta_info.ud;
         if isempty(adata{idx_ew}) || isempty(adata{idx_ns})
             fprintf('台站 %s 在 adata 中记录为空，跳过。\n', sta_name);
             continue;
         end
 
-        % 构造要处理的分量列表
-        comp_indices = [idx_ew, idx_ns,idx_ud];
-        comp_labels  = {'ew', 'ns','ud'};        
+        % 仅处理水平分量
+        comp_indices = [idx_ew, idx_ns];
+        comp_labels  = {'ew', 'ns'};
         fprintf('处理台站 %s\n', sta_name);
 
         for ic = 1:numel(comp_indices)
@@ -55,14 +53,6 @@ function adata = multiband_filter_controller(adata, paired_stations, T_list, fc_
             for iT = 1:numel(T_list)
                 T0 = T_list(iT);
                 fch=fc_high(iT);
-                % T0 == 0.1 s：三分量都处理
-                % T0 ~= 0.1 s：只处理 EW/NS，跳过 UD
-                is_T01 = abs(T0 - 0.1) < 1e-6;
-                if ~is_T01 && strcmp(comp_lab, 'ud')
-                    % 非 0.1 s 且是 UD 分量 → 跳过
-                    continue;
-                end
-
                 % 调用纯函数 nb_filt
                 [acc_untrim, trim_info] = nb_filt(data_orig, fch, T0);
 

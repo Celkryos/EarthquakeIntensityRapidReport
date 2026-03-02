@@ -8,38 +8,40 @@
 %   合成时程
 clear; close all; clc;
 %% 批量读
-%adata=batch_read_earthquake_data('D:\FAST\20250113211900knt');
-adata=batch_read_earthquake_data('D:\FAST\20250602035200knt');
+adata=batch_read_earthquake_data('D:\FAST\20260106101800_6.2');
 %% 初步矫正
 adata=chubu(adata);
 
-
-%% 台站配对
+%% 记录匹配
 [stations, unpaired] = pair_earthquake_stations(adata);
 
 %% 剔除低信噪比记录
 [adata, stations, rejected_info] = check_truncated_records(adata, stations);
 
 %% 多频段滤波
-T_list  = [5, 2, 1, 0.5,0.1];   % 周期
-%fc_high = [0.1,0.1,0.1,0.1,0.1];    % Hz
-fc_high = [0.1,0.2,0.5,1,0.1];    % Hz
+T_list  = [5, 2, 1, 0.5,0.1,0.02];   % 周期
+fc_high = [0.1,0.1,0.1,0.1,0.1,0.1];    % Hz
 adata = multiband_filter_controller(adata, stations, T_list, fc_high);
 %% 积
-acc_fields = {'acc_T5_000s','acc_T2_000s','acc_T1_000s','acc_T0_500s','acc_T0_100s'};
+acc_fields = {'acc_T5_000s','acc_T2_000s','acc_T1_000s','acc_T0_500s','acc_T0_100s','acc_T0_020s'};
 for i = 1:numel(adata)
-    if ~(adata{i}.is_valid), continue; end
+    if ~isfield(adata{i}, 'is_valid') || ~(adata{i}.is_valid), continue; end
+    % 仅对水平分量积分
+    if isfield(adata{i}, 'direction')
+        d = upper(char(adata{i}.direction));
+        if contains(d, 'U')
+            continue;
+        end
+    end
     adata{i} = acc2vel(adata{i}, acc_fields);
 end
-%% 合成时程（水平 / 三分量）
+%% 合成水平时程
 stations = hcsc(adata, stations, T_list);
-%% 计算国标烈度
-stations = compute_intensity_gb(stations);
 %% 插值并输出等高线图
 % 1. 构造输入数组
-%ziduan='pgv_T0_100';kong=true;
+%ziduan='pgv_T0_100_h';kong=true;
 %ziduan='pgv_T5_000_h';kong=true;
-ziduan='I_gb';kong=false;
+ziduan='pgv_T0_100_h';kong=true;
 names = fieldnames(stations);
 lon_sta = [];
 lat_sta = [];
@@ -85,4 +87,4 @@ plot_contour_field(LonG, LatG, ZZ, metaZ, lon_sta, lat_sta);
 %%
 %plotSpectrum(x, fs);
 % 测试另一个函数
-[Xq, Yq, Vq] = interp_seismic_field(lon_sta, lat_sta, val_sta, 'linear');
+%[Xq, Yq, Vq] = interp_seismic_field(lon_sta, lat_sta, val_sta, 'linear');
