@@ -1,9 +1,9 @@
 %% 批量地震动参数相关性分析
 % 功能：
 % 1. 支持切换 PGA / PGV 分析模式
-% 2. 以最短周期（通常为 T=0.02s）为基准，分析与其他周期的相关性
+% 2. 以最短周期（通常为 T=0.02s）为因变量 Y，各长周期分别作为自变量 X
 % 3. 绘制所有周期的回归散点图 (Figure 1)
-% 4.绘制 R^2 随周期变化的趋势图 (Figure 2)
+% 4. 绘制 R^2 随周期变化的趋势图 (Figure 2)
 %
 % 依赖变量：stations (结构体)
 
@@ -15,7 +15,7 @@ clc; close all;
 % 1. 分析类型选择: 'PGA' 或 'PGV'
 analysis_type = 'PGA'; 
 
-% 2. 基准周期的后缀（通常选最短周期 T=0.02s 作为基准）
+% 2. 基准周期的后缀（通常选最短周期 T=0.02s 作为因变量 Y）
 %    脚本会自动拼接前缀，如 'pga_' + basis_suffix
 basis_suffix  = 'T0_020_h'; 
 
@@ -37,14 +37,15 @@ switch upper(analysis_type)
 end
 
 fprintf('--- 开始批量分析 (%s 模式) ---\n', analysis_type);
-fprintf('基准变量 (X): %s\n', basis_field);
+fprintf('因变量 (Y): %s（最短周期）\n', basis_field);
+fprintf('自变量 (X): 各长周期字段\n');
 
 %% 1. 数据提取与准备
 names = fieldnames(stations);
 is_valid_sta = false(numel(names), 1);
 all_vals_basis = nan(numel(names), 1);
 
-% 提取基准数据 (X)
+% 提取基准数据（最短周期，作为 Y）
 for i = 1:numel(names)
     s = stations.(names{i});
     if isfield(s, 'is_valid') && s.is_valid && isfield(s, basis_field)
@@ -60,7 +61,7 @@ if sum(is_valid_sta) < 5
     error('有效数据点太少 (<5)，请检查 basis_field 设置是否正确。');
 end
 
-% 查找所有目标字段 (Y)
+% 查找所有目标字段（长周期，作为 X）
 sample_sta = stations.(names{find(is_valid_sta, 1)});
 all_fields = fieldnames(sample_sta);
 match_idx  = ~cellfun(@isempty, regexp(all_fields, target_pattern));
@@ -84,11 +85,11 @@ end
 [T_vals, sort_idx] = sort(T_vals);
 target_fields = target_fields(sort_idx);
 
-fprintf('共找到 %d 个目标字段，开始拟合...\n', numel(target_fields));
+fprintf('共找到 %d 个目标字段（长周期），开始拟合...\n', numel(target_fields));
 
 %% 2. 循环拟合与绘制散点图 (Figure 1)
 n_targets = numel(target_fields);
-colors = parula(n_targets);   % 
+colors = parula(n_targets);
 
 % 记录 R2 数据用于 Figure 2
 R2_history = zeros(n_targets, 1);
@@ -103,20 +104,20 @@ n_cols = ceil(sqrt(n_targets));
 n_rows = ceil(n_targets / n_cols);
 
 for k = 1:n_targets
-    y_field = target_fields{k};
+    x_field = target_fields{k};  % 长周期作为 X
     col = colors(k, :);
     
-    % 提取 Y 数据
-    vals_y = nan(size(all_vals_basis));
+    % 提取长周期数据（X）
+    vals_x = nan(size(all_vals_basis));
     mask   = is_valid_sta;
     
     for i = 1:numel(names)
         if ~mask(i), continue; end
         s = stations.(names{i});
-        if isfield(s, y_field)
-            v = s.(y_field);
+        if isfield(s, x_field)
+            v = s.(x_field);
             if ~isempty(v) && (~use_log || v > 0)
-                vals_y(i) = v;
+                vals_x(i) = v;
             else
                 mask(i) = false; 
             end
@@ -125,8 +126,9 @@ for k = 1:n_targets
         end
     end
     
-    X = all_vals_basis(mask);
-    Y = vals_y(mask);
+    % 长周期 -> X，最短周期 -> Y
+    X = vals_x(mask);
+    Y = all_vals_basis(mask);
     
     if isempty(X)
         R2_history(k) = NaN;
@@ -144,7 +146,7 @@ for k = 1:n_targets
         label_prefix = '';
     end
     
-    % 线性回归
+    % 线性回归: Y(最短周期) = k_slope * X(长周期) + b
     mdl = fitlm(XX, YY);
     b = mdl.Coefficients.Estimate(1); 
     k_slope = mdl.Coefficients.Estimate(2); 
@@ -154,7 +156,7 @@ for k = 1:n_targets
     R2_history(k) = r2;
     
     % --- 绘图 (Subplot) ---
-    figure(fig1); % 确保画在 fig1 上
+    figure(fig1);
     subplot(n_rows, n_cols, k);
     hold on; box on; grid on;
     
@@ -171,12 +173,12 @@ for k = 1:n_targets
     title_str = sprintf('T = %.3f s', T_vals(k));
     title(title_str, 'FontSize', 10, 'FontWeight', 'bold');
     
-    % 坐标标签
+    % 坐标标签: X轴为长周期，Y轴为最短周期
     if k > (n_rows-1)*n_cols % 最后一行显示X轴标签
-        xlabel([label_prefix ' (' strrep(basis_field, '_', '\_') ')'], 'FontSize', 8);
+        xlabel([label_prefix ' (' strrep(x_field, '_', '\_') ')'], 'FontSize', 8);
     end
     if mod(k, n_cols) == 1 % 第一列显示Y轴标签
-        ylabel([label_prefix ' (Target)'], 'FontSize', 8);
+        ylabel([label_prefix ' (' strrep(basis_field, '_', '\_') ')'], 'FontSize', 8);
     end
     
     % 显示公式与 R2 (精确到小数点后4位)
@@ -193,7 +195,7 @@ for k = 1:n_targets
     ylim([min(YY)-0.1*y_range, max(YY)+0.1*y_range]);
     hold off;
 end
-sgtitle(fig1, ['Correlation Analysis: ' analysis_type ' (Base: ' strrep(basis_field, '_', '\_') ')'], ...
+sgtitle(fig1, ['Correlation Analysis: ' analysis_type ' (Y: ' strrep(basis_field, '_', '\_') ', X: Long Periods)'], ...
     'FontSize', 14, 'FontWeight', 'bold');
 
 %% 3. 绘制 R^2 随周期变化趋势图 (Figure 2 - 新窗口)
@@ -204,15 +206,15 @@ R2_plot = R2_history(valid_idx);
 
 if ~isempty(T_plot)
     fig2 = figure('Name', ['R2 vs Period - ' analysis_type], 'Color', 'w', ...
-        'Units', 'normalized', 'Position', [0.66 0.1 0.3 0.4]); % 放在屏幕右侧
+        'Units', 'normalized', 'Position', [0.66 0.1 0.3 0.4]);
     
     plot(T_plot, R2_plot, '-o', 'LineWidth', 2, 'MarkerSize', 6, ...
         'MarkerFaceColor', 'b', 'Color', 'b');
     grid on; box on;
     
-    xlabel('Period T (s)');
+    xlabel('Period T (s) [自变量周期]');
     ylabel('Coefficient of Determination (R^2)');
-    title(['R^2 vs. Period (' analysis_type ')']);
+    title(['R^2 vs. Period (' analysis_type ', Y=' strrep(basis_field, '_', '\_') ')']);
     
     % 标记每个点的数值 (精确到4位)
     for i = 1:length(T_plot)
