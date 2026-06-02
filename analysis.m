@@ -5,7 +5,7 @@
 % 3. 绘制所有周期的回归散点图 (Figure 1)
 % 4. 绘制 R^2 随周期变化的趋势图 (Figure 2)
 %
-% 依赖变量：stations (结构体)
+% 依赖变量：stations
 
 clearvars -except stations adata; 
 clc; close all;
@@ -13,7 +13,7 @@ clc; close all;
 %% ================= 配置区域 =================
 
 % 1. 分析类型选择: 'PGA' 或 'PGV'
-analysis_type = 'PGA'; 
+analysis_type = 'PGV'; 
 
 % 2. 基准周期的后缀（通常选最短周期 T=0.02s 作为因变量 Y）
 %    脚本会自动拼接前缀，如 'pga_' + basis_suffix

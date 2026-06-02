@@ -7,9 +7,15 @@
 %   统一剪裁
 %   合成时程
 clear; close all; clc;
-%% 批量读
-adata=batch_read_earthquake_data('D:\FAST\20260106101800_6.2');
-%% 初步矫正
+%% 构造事件目录索引
+root_dir = 'D:\FAST\earthquakedir';
+event_dirs = build_earthquake_read_dirs(root_dir);
+
+%% 指定读取第 m 组、第 n 个事件
+m = 1;
+n = 2;
+
+[adata, event_info] = read_earthquake_event(event_dirs, m, n);%% 初步矫正
 adata=chubu(adata);
 
 %% 记录匹配
