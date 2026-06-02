@@ -56,6 +56,7 @@ function metric_table = stations_to_metric_table(stations, event_info)
     template.station_long = NaN;
     template.dist_km = NaN;
     template.noise_ratio = NaN;
+    template.magnitude = NaN;
 
     % 指标字段，全部先预置为 NaN
     for k = 1:numel(all_metric_fields)
@@ -101,6 +102,10 @@ function metric_table = stations_to_metric_table(stations, event_info)
 
         if isfield(s, 'noise_ratio')
             row.noise_ratio = s.noise_ratio;
+        end
+
+        if isfield(s, 'magnitude')
+            row.magnitude = s.magnitude;
         end
 
         % 指标字段

@@ -153,10 +153,11 @@ function [adata, paired_stations, rejected_info] = check_truncated_records(adata
                 % --- 保留分支：将计算出的参数写回结构体 ---
                 
                 % 1. 更新 paired_stations
-                paired_stations.(name).dist_km   = dist_km;
-                paired_stations.(name).noise_rms = start_rms; % 新增：写入初始噪声RMS
+                paired_stations.(name).dist_km     = dist_km;
+                paired_stations.(name).noise_rms   = start_rms;
                 paired_stations.(name).noise_ratio = noise_ratio;
-                paired_stations.(name).is_valid  = true;
+                paired_stations.(name).is_valid    = true;
+                paired_stations.(name).magnitude   = data_ref.magnitude;
                 
                 % 2. 更新 adata (EW分量)
                 adata{idx_ew}.dist_km   = dist_km;       % 新增：写入距离
